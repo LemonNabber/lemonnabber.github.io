@@ -4,17 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rebecca — Designer</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #FAF7F1;
-    --ink: #211F1C;
-    --ink-soft: #5A564D;
-    --surface: #F1EBDE;
-    --line: #DED5C3;
+    --font-main: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    --bg: #FFFFFF;
+    --ink: #171614;
+    --ink-soft: #6B6862;
+    --surface: #FFFFFF;
+    --line: #E4E2DC;
     --accent: #4B6357;
     --accent-warm: #E2A649;
+
+    /* CMY color wheel — primaries + their overlaps */
+    --cmy-cyan: #17BEBB;
+    --cmy-magenta: #E6399B;
+    --cmy-yellow: #FFC93C;
+    --cmy-red: #F2545B;
+    --cmy-green: #58A65C;
+    --cmy-blue: #4062BB;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,13 +31,14 @@
   body {
     background: var(--bg);
     color: var(--ink);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-main);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, .brand {
-    font-family: 'Nunito', sans-serif;
+    font-family: var(--font-main);
+    font-weight: 700;
   }
 
   a { color: inherit; text-decoration: none; }
@@ -70,7 +78,8 @@
     gap: 32px;
     list-style: none;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
   }
 
   .nav-links a {
@@ -101,70 +110,72 @@
     width: 100%;
   }
 
-  /* ---------- Hero ---------- */
+  /* ---------- Hero / sticker box ---------- */
+  /* The hero is pinned to the viewport. The rest of the page (.page-content)
+     scrolls up and over it, like a sheet of paper being pulled across a
+     sticker board. */
 
   .hero {
-    position: relative;
-    padding: 96px 0 72px;
+    position: fixed;
+    inset: 0;
+    height: 100svh;
+    width: 100%;
+    z-index: 1;
     overflow: hidden;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .hero-doodle {
+  .candy-stage {
     position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 260px;
-    height: 260px;
-    pointer-events: none;
-    opacity: 0.9;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none; /* flip to auto once candies are interactive/draggable */
   }
 
-  .hero-doodle circle {
-    animation: drift 7s ease-in-out infinite;
-    transform-origin: center;
-  }
-
-  .hero-doodle circle:nth-child(2) { animation-delay: -2s; }
-  .hero-doodle circle:nth-child(3) { animation-delay: -4.5s; }
-
-  @keyframes drift {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-14px); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hero-doodle circle { animation: none; }
-  }
+  .candy-stage canvas { display: block; width: 100%; height: 100%; }
 
   .hero-inner {
-    max-width: 620px;
+    position: relative;
+    z-index: 5;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 32px;
+    text-align: center;
+    pointer-events: none;
   }
 
   .hero-eyebrow {
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     color: var(--accent);
     font-weight: 600;
+    letter-spacing: 0.03em;
     margin-bottom: 14px;
   }
 
   .hero h1 {
-    font-size: clamp(2.1rem, 4.5vw, 3.1rem);
-    font-weight: 800;
-    line-height: 1.15;
+    font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+    font-weight: 700;
+    line-height: 1.1;
     letter-spacing: -0.02em;
   }
 
   .hero p {
-    margin-top: 18px;
-    font-size: 1.05rem;
+    margin: 16px auto 0;
+    font-size: 0.82rem;
     color: var(--ink-soft);
-    max-width: 480px;
+    max-width: 400px;
+    line-height: 1.6;
   }
 
   .hero-actions {
     margin-top: 32px;
     display: flex;
     gap: 16px;
+    justify-content: center;
+    pointer-events: auto;
   }
 
   .btn {
@@ -172,7 +183,7 @@
     padding: 12px 22px;
     border-radius: 6px;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     transition: transform 0.15s ease, background 0.2s ease;
   }
 
@@ -190,13 +201,55 @@
 
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* placeholder note for future JS interactive area */
-  .interactive-note {
-    margin-top: 40px;
-    font-size: 0.8rem;
+  .hero-hint {
+    margin-top: 28px;
+    font-size: 0.7rem;
     color: var(--ink-soft);
-    border-left: 2px solid var(--accent-warm);
-    padding-left: 12px;
+    opacity: 0.7;
+  }
+
+  .scroll-cue {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+  }
+
+  .scroll-cue span {
+    width: 1px;
+    height: 22px;
+    background: var(--ink-soft);
+    opacity: 0.4;
+    animation: scrollcue 1.8s ease-in-out infinite;
+  }
+
+  @keyframes scrollcue {
+    0% { transform: scaleY(0); transform-origin: top; opacity: 0; }
+    40% { transform: scaleY(1); transform-origin: top; opacity: 0.5; }
+    60% { transform: scaleY(1); transform-origin: bottom; opacity: 0.5; }
+    100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+  }
+
+  /* candy placeholder styling lives in the three.js scene now — see script below */
+
+  /* ---------- Page content that scrolls over the pinned hero ---------- */
+
+  .page-content {
+    position: relative;
+    z-index: 2;
+    margin-top: 100svh;
+    background: var(--bg);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -18px 40px rgba(33, 31, 28, 0.18);
   }
 
   /* ---------- Section headings ---------- */
@@ -209,19 +262,20 @@
   }
 
   .section-head h2 {
-    font-size: clamp(1.6rem, 3vw, 2.1rem);
-    font-weight: 800;
+    font-size: clamp(1.9rem, 3.4vw, 2.4rem);
+    font-weight: 700;
     letter-spacing: -0.02em;
   }
 
   .section-head p {
     margin-top: 10px;
+    font-size: 0.82rem;
     color: var(--ink-soft);
   }
 
   /* ---------- Work / Projects grid ---------- */
 
-  #work { border-top: 1px solid var(--line); }
+  #work { border-top: 1px solid var(--line); border-radius: 22px 22px 0 0; }
 
   .project-grid {
     display: grid;
@@ -230,7 +284,7 @@
   }
 
   .project-card {
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
@@ -241,7 +295,7 @@
   .project-shot {
     aspect-ratio: 16 / 10;
     background:
-      repeating-linear-gradient(45deg, #E7DFCE, #E7DFCE 10px, #EFE8D9 10px, #EFE8D9 20px);
+      repeating-linear-gradient(45deg, #F2F1EE, #F2F1EE 10px, #FAFAF9 10px, #FAFAF9 20px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -257,21 +311,22 @@
   }
 
   .project-body h3 {
-    font-size: 1.15rem;
+    font-size: 1.3rem;
     font-weight: 700;
   }
 
   .project-tag {
     display: inline-block;
     margin-top: 6px;
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--accent);
   }
 
   .project-body p {
     margin-top: 12px;
-    font-size: 0.92rem;
+    font-size: 0.8rem;
     color: var(--ink-soft);
   }
 
@@ -279,7 +334,7 @@
     margin-top: 16px;
     display: flex;
     gap: 18px;
-    font-size: 0.88rem;
+    font-size: 0.76rem;
     font-weight: 600;
   }
 
@@ -304,19 +359,19 @@
   .about-photo {
     aspect-ratio: 4 / 5;
     border-radius: 10px;
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--ink-soft);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 600;
     text-align: center;
     padding: 16px;
   }
 
-  .about-copy p { color: var(--ink-soft); margin-bottom: 16px; }
+  .about-copy p { color: var(--ink-soft); font-size: 0.82rem; margin-bottom: 16px; }
 
   .skills-list {
     margin-top: 24px;
@@ -328,10 +383,10 @@
   .skills-list li {
     list-style: none;
     padding: 7px 14px;
-    background: var(--surface);
+    background: var(--bg);
     border: 1px solid var(--line);
     border-radius: 999px;
-    font-size: 0.85rem;
+    font-size: 0.74rem;
     font-weight: 600;
     color: var(--ink);
   }
@@ -350,6 +405,7 @@
     display: block;
     margin-top: 10px;
     font-weight: 600;
+    font-size: 0.85rem;
     color: var(--accent);
   }
 
@@ -362,7 +418,7 @@
   }
 
   label {
-    font-size: 0.85rem;
+    font-size: 0.74rem;
     font-weight: 600;
     margin-bottom: 4px;
     display: block;
@@ -375,7 +431,7 @@
     border-radius: 6px;
     background: var(--bg);
     font-family: inherit;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: var(--ink);
   }
 
@@ -407,14 +463,14 @@
     display: flex;
     gap: 22px;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.76rem;
   }
 
   .social-links a { color: var(--ink-soft); }
   .social-links a:hover { color: var(--accent); }
 
   .footer-note {
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     color: var(--ink-soft);
   }
 
@@ -426,170 +482,549 @@
     .about-photo { max-width: 240px; }
     .contact-grid { grid-template-columns: 1fr; }
     .nav-links { gap: 18px; font-size: 0.85rem; }
-    .hero-doodle { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scroll-cue span { animation: none; }
   }
 </style>
 </head>
 <body>
 
-<nav class="site-nav">
-  <div class="wrap">
-    <a href="#top" class="brand">Rebecca</a>
-    <ul class="nav-links">
-      <li><a href="#work">Work</a></li>
-      <li><a href="#about">About</a></li>
-      <li><a href="#contact">Contact</a></li>
-    </ul>
-  </div>
-</nav>
-
 <header class="hero" id="top">
-  <div class="wrap">
-    <!-- interactive JS area placeholder: hero-doodle svg animates gently now,
-         swap this space for a canvas/interactive sketch later -->
-    <svg class="hero-doodle" viewBox="0 0 200 200" aria-hidden="true">
-      <circle cx="150" cy="40" r="10" fill="var(--accent-warm)" />
-      <circle cx="170" cy="90" r="6" fill="var(--accent)" />
-      <circle cx="120" cy="110" r="4" fill="var(--ink)" opacity="0.5" />
-    </svg>
+  <div class="candy-stage" id="candyStage"></div>
 
-    <div class="hero-inner">
-      <p class="hero-eyebrow">Hi, I'm Rebecca</p>
-      <h1>Rebecca is a designer who loves the little things.</h1>
-      <p>[PLACEHOLDER: one or two sentences on what you design, who you design for, and what makes your work distinct.]</p>
-      <div class="hero-actions">
-        <a href="#work" class="btn btn-primary">See my work</a>
-        <a href="#contact" class="btn btn-secondary">Get in touch</a>
-      </div>
-      <p class="interactive-note">[PLACEHOLDER: reserved space — drop an interactive sketch, cursor effect, or small JS demo here later]</p>
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Hi, I'm Rebecca</p>
+    <h1>Rebecca is a designer who loves the little things.</h1>
+    <p>[PLACEHOLDER: one or two sentences on what you design, who you design for, and what makes your work distinct.]</p>
+    <div class="hero-actions">
+      <a href="#work" class="btn btn-primary">See my work</a>
+      <a href="#contact" class="btn btn-secondary">Get in touch</a>
     </div>
   </div>
+
+  <div class="scroll-cue"><span></span>scroll</div>
 </header>
 
-<section id="work">
-  <div class="wrap">
-    <div class="section-head">
-      <h2>Selected work</h2>
-      <p>A handful of projects I've designed and built — swap in real screenshots, write-ups, and links.</p>
-    </div>
+<div class="page-content">
 
-    <div class="project-grid">
-
-      <article class="project-card">
-        <div class="project-shot">[PLACEHOLDER: project screenshot 1]</div>
-        <div class="project-body">
-          <h3>[Project Name One]</h3>
-          <span class="project-tag">[Type — e.g. Web App]</span>
-          <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
-          <div class="project-links">
-            <a href="#">View code</a>
-            <a href="#">Live site</a>
-          </div>
-        </div>
-      </article>
-
-      <article class="project-card">
-        <div class="project-shot">[PLACEHOLDER: project screenshot 2]</div>
-        <div class="project-body">
-          <h3>[Project Name Two]</h3>
-          <span class="project-tag">[Type — e.g. Mobile App]</span>
-          <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
-          <div class="project-links">
-            <a href="#">View code</a>
-            <a href="#">Live site</a>
-          </div>
-        </div>
-      </article>
-
-      <article class="project-card">
-        <div class="project-shot">[PLACEHOLDER: project screenshot 3]</div>
-        <div class="project-body">
-          <h3>[Project Name Three]</h3>
-          <span class="project-tag">[Type — e.g. Branding]</span>
-          <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
-          <div class="project-links">
-            <a href="#">View code</a>
-          </div>
-        </div>
-      </article>
-
-      <article class="project-card">
-        <div class="project-shot">[PLACEHOLDER: project screenshot 4]</div>
-        <div class="project-body">
-          <h3>[Project Name Four]</h3>
-          <span class="project-tag">[Type — e.g. Illustration]</span>
-          <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
-          <div class="project-links">
-            <a href="#">View code</a>
-          </div>
-        </div>
-      </article>
-
-    </div>
-  </div>
-</section>
-
-<section id="about">
-  <div class="wrap about-grid">
-    <div class="about-photo">[PLACEHOLDER: your photo]</div>
-    <div class="about-copy">
-      <div class="section-head">
-        <h2>About me</h2>
-      </div>
-      <p>[PLACEHOLDER: a paragraph about who you are — your background, how you got into design, and what drives your work.]</p>
-      <p>[PLACEHOLDER: a paragraph about your interests outside of design, and what "the little things" means to you and your process.]</p>
-      <ul class="skills-list">
-        <li>[Skill]</li>
-        <li>[Skill]</li>
-        <li>[Skill]</li>
-        <li>[Skill]</li>
-        <li>[Skill]</li>
+  <nav class="site-nav">
+    <div class="wrap">
+      <a href="#top" class="brand">Rebecca</a>
+      <ul class="nav-links">
+        <li><a href="#work">Work</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
       </ul>
     </div>
-  </div>
-</section>
+  </nav>
 
-<section id="contact">
-  <div class="wrap contact-grid">
-    <div class="contact-info">
+  <section id="work">
+    <div class="wrap">
       <div class="section-head">
-        <h2>Let's talk</h2>
-        <p>[PLACEHOLDER: a line inviting people to reach out — about work, collaboration, or just to say hi.]</p>
+        <h2>Selected work</h2>
+        <p>A handful of projects I've designed and built — swap in real screenshots, write-ups, and links.</p>
       </div>
-      <a href="mailto:[email protected]">[[email protected]]</a>
-      <a href="https://github.com/[username]">[github.com/username]</a>
-      <a href="https://linkedin.com/in/[username]">[linkedin.com/in/username]</a>
-    </div>
 
-    <form>
-      <div>
-        <label for="name">Name</label>
-        <input type="text" id="name" placeholder="Your name">
-      </div>
-      <div>
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="[email protected]">
-      </div>
-      <div>
-        <label for="message">Message</label>
-        <textarea id="message" placeholder="Say hello..."></textarea>
-      </div>
-      <button type="submit" class="btn btn-primary">Send message</button>
-    </form>
-  </div>
-</section>
+      <div class="project-grid">
 
-<footer>
-  <div class="wrap footer-row">
-    <span class="footer-note">© 2026 Rebecca. Built for [Class Name].</span>
-    <div class="social-links">
-      <a href="#">GitHub</a>
-      <a href="#">LinkedIn</a>
-      <a href="#">Instagram</a>
-      <a href="#">Dribbble</a>
+        <article class="project-card">
+          <div class="project-shot">[PLACEHOLDER: project screenshot 1]</div>
+          <div class="project-body">
+            <h3>[Project Name One]</h3>
+            <span class="project-tag">[Type — e.g. Web App]</span>
+            <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
+            <div class="project-links">
+              <a href="#">View code</a>
+              <a href="#">Live site</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-shot">[PLACEHOLDER: project screenshot 2]</div>
+          <div class="project-body">
+            <h3>[Project Name Two]</h3>
+            <span class="project-tag">[Type — e.g. Mobile App]</span>
+            <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
+            <div class="project-links">
+              <a href="#">View code</a>
+              <a href="#">Live site</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-shot">[PLACEHOLDER: project screenshot 3]</div>
+          <div class="project-body">
+            <h3>[Project Name Three]</h3>
+            <span class="project-tag">[Type — e.g. Branding]</span>
+            <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
+            <div class="project-links">
+              <a href="#">View code</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="project-card">
+          <div class="project-shot">[PLACEHOLDER: project screenshot 4]</div>
+          <div class="project-body">
+            <h3>[Project Name Four]</h3>
+            <span class="project-tag">[Type — e.g. Illustration]</span>
+            <p>[PLACEHOLDER: one or two sentences describing the problem, your role, and the outcome.]</p>
+            <div class="project-links">
+              <a href="#">View code</a>
+            </div>
+          </div>
+        </article>
+
+      </div>
     </div>
-  </div>
-</footer>
+  </section>
+
+  <section id="about">
+    <div class="wrap about-grid">
+      <div class="about-photo">[PLACEHOLDER: your photo]</div>
+      <div class="about-copy">
+        <div class="section-head">
+          <h2>About me</h2>
+        </div>
+        <p>[PLACEHOLDER: a paragraph about who you are — your background, how you got into design, and what drives your work.]</p>
+        <p>[PLACEHOLDER: a paragraph about your interests outside of design, and what "the little things" means to you and your process.]</p>
+        <ul class="skills-list">
+          <li>[Skill]</li>
+          <li>[Skill]</li>
+          <li>[Skill]</li>
+          <li>[Skill]</li>
+          <li>[Skill]</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="wrap contact-grid">
+      <div class="contact-info">
+        <div class="section-head">
+          <h2>Let's talk</h2>
+          <p>[PLACEHOLDER: a line inviting people to reach out — about work, collaboration, or just to say hi.]</p>
+        </div>
+        <a href="mailto:[email protected]">[[email protected]]</a>
+        <a href="https://github.com/[username]">[github.com/username]</a>
+        <a href="https://linkedin.com/in/[username]">[linkedin.com/in/username]</a>
+      </div>
+
+      <form>
+        <div>
+          <label for="name">Name</label>
+          <input type="text" id="name" placeholder="Your name">
+        </div>
+        <div>
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="[email protected]">
+        </div>
+        <div>
+          <label for="message">Message</label>
+          <textarea id="message" placeholder="Say hello..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send message</button>
+      </form>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap footer-row">
+      <span class="footer-note">© 2026 Rebecca. Built for [Class Name].</span>
+      <div class="social-links">
+        <a href="#">GitHub</a>
+        <a href="#">LinkedIn</a>
+        <a href="#">Instagram</a>
+        <a href="#">Dribbble</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ------------------------------------------------------------------
+   CANDY STAGE
+   ------------------------------------------------------------------
+   Goal: a 3D scene that renders ONLY the objects and their shadows,
+   with a fully transparent background, layered over the plain-HTML
+   hero text. The "ground" the candies sit on is an invisible plane —
+   it never draws itself, it only catches shadows — so the illusion
+   is that the candies are resting directly on the page/text below.
+
+   Nothing here is final content. It's the rig: renderer, camera,
+   lights, and an invisible shadow-catcher ground, proven out with one
+   placeholder bumpy sphere standing in for a konpeito candy. Swap the
+   placeholder for real geometry/instances later; the stage itself
+   shouldn't need to change.
+------------------------------------------------------------------- */
+
+const stageEl = document.getElementById('candyStage');
+const hero = document.getElementById('top');
+
+let width = hero.clientWidth;
+let height = hero.clientHeight;
+
+// --- renderer: transparent background is what sells the illusion ---
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0); // fully transparent
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(width, height);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stageEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// --- camera ---
+// Orthographic + straight top-down = true parallel projection onto the
+// floor, matching "looking directly down, parallel with the floor."
+// (A perspective camera pointed straight down would still converge
+// toward a vanishing point; orthographic doesn't.)
+const VIEW_HEIGHT = 5; // world units visible vertically at aspect 1
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 50);
+camera.up.set(0, 0, -1); // avoid gimbal ambiguity when looking straight down +Y
+camera.position.set(0, 10, 0);
+camera.lookAt(0, 0, 0);
+
+function fitCameraFrustum() {
+  const aspect = width / height;
+  camera.left = -VIEW_HEIGHT * aspect;
+  camera.right = VIEW_HEIGHT * aspect;
+  camera.top = VIEW_HEIGHT;
+  camera.bottom = -VIEW_HEIGHT;
+  camera.updateProjectionMatrix();
+}
+fitCameraFrustum();
+
+// --- lights ---
+// Soft ambient/hemisphere fill so shadows don't crush to pure black,
+// plus one key directional light that actually casts the shadow.
+const hemi = new THREE.HemisphereLight(0xfff7ea, 0xd8cdb8, 0.55);
+scene.add(hemi);
+
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(3.2, 6, 3.5);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0015;
+key.shadow.radius = 9; // wider PCF blur = fuzzier penumbra; core shadow opacity (set by ShadowMaterial below) is untouched, so brightness of the shadow itself doesn't change
+scene.add(key);
+
+// --- invisible shadow-catcher ground ---
+// ShadowMaterial renders nothing but the shadow falling on it — with
+// the renderer's transparent background, everywhere NOT in shadow is
+// see-through, showing the HTML text/page behind the canvas.
+const GROUND_SIZE = 12;
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
+  new THREE.ShadowMaterial({ opacity: 0.32 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// fit the key light's shadow frustum to the ground so shadow quality
+// isn't wasted on space nothing occupies
+const d = GROUND_SIZE / 2;
+key.shadow.camera.left = -d;
+key.shadow.camera.right = d;
+key.shadow.camera.top = d;
+key.shadow.camera.bottom = -d;
+key.shadow.camera.near = 0.5;
+key.shadow.camera.far = 20;
+key.shadow.camera.updateProjectionMatrix();
+// target the origin so the frustum above actually lines up
+scene.add(key.target);
+key.target.position.set(0, 0, 0);
+
+/* ------------------------------------------------------------------
+   PLACEHOLDER "candy" — a bumpy sphere, NOT final art.
+   Just here to prove the rig: does it sit on the ground, cast a soft
+   shadow, and read as a translucent, glossy object through a
+   transparent canvas? Swap this mesh out for real konpeito geometry
+   (or an instanced field of many) later — the stage above shouldn't
+   need to change.
+------------------------------------------------------------------- */
+/* ------------------------------------------------------------------
+   Placeholder "candy" geometry — konpeito's real distinguishing
+   feature isn't uniform roughness, it's a countable number of smooth,
+   distinct conical knobs scattered fairly evenly over an otherwise
+   round core. Random per-vertex noise (what was here before) reads
+   as a rough asteroid instead. This places knob centers using a
+   Fibonacci sphere distribution (even coverage, no clustering/gaps),
+   then raises a smooth falloff bump at each one.
+
+   Still not final art — a stand-in to judge whether procedural is
+   good enough or a sourced/sculpted model is worth the licensing and
+   loader overhead. Tune knobCount/knobHeight/knobFalloff to taste.
+------------------------------------------------------------------- */
+function makeKonpeitoGeometry(radius, knobCount, knobHeight, knobFalloff, detail) {
+  const geo = new THREE.IcosahedronGeometry(radius, detail);
+
+  // knob centers, evenly distributed over the unit sphere
+  const knobs = [];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < knobCount; i++) {
+    const y = 1 - (i / (knobCount - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const theta = goldenAngle * i;
+    knobs.push(new THREE.Vector3(Math.cos(theta) * r, y, Math.sin(theta) * r));
+  }
+
+  const pos = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize(); // point on unit sphere
+
+    let bump = 0;
+    for (let k = 0; k < knobs.length; k++) {
+      const d = v.distanceTo(knobs[k]);
+      const influence = Math.max(0, 1 - d / knobFalloff);
+      bump += influence * influence * influence; // smooth peak, not a hard cone
+    }
+    bump = Math.min(bump, 1.5); // clamp where knobs overlap
+
+    v.multiplyScalar(radius * (1 + bump * knobHeight));
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const candyGeo = makeKonpeitoGeometry(
+  /* radius */ 0.55,
+  /* knobCount */ 34,
+  /* knobHeight */ 0.48,
+  /* knobFalloff */ 0.4,
+  /* detail */ 5
+);
+
+const candyColor = 0xf2879c; // stand-in konpeito pink, swap per-candy later
+
+const candyMat = new THREE.MeshPhysicalMaterial({
+  color: candyColor,
+  roughness: 0.35,
+  clearcoat: 0.6,
+  clearcoatRoughness: 0.25,
+  transmission: 0.35,    // hints at translucency; not true light-through-shadow
+  thickness: 0.6,
+  ior: 1.45,
+});
+
+const placeholderCandy = new THREE.Mesh(candyGeo, candyMat);
+placeholderCandy.position.set(0, 0.55, 0);
+placeholderCandy.castShadow = true;
+placeholderCandy.receiveShadow = false;
+scene.add(placeholderCandy);
+
+/* ------------------------------------------------------------------
+   SHADOW TINT — candy color bleeding into the cast shadow itself.
+
+   Unlike the light-bleed glow below (which stays directly under the
+   candy, representing light transmitting straight down through the
+   base), this needs to sit at the shadow's ACTUAL position — which is
+   offset from the candy because the key light comes in at an angle,
+   not straight down. So this projects the candy's position along the
+   real light direction onto the ground, the same math a real shadow
+   uses, and centers the gradient there instead of guessing.
+
+   Gradient: candy color near the object, fading through to a light
+   neutral grey further out, with a long soft tail at the outer edge
+   for the "fuzzier furthest from the candy" look. Drawn with normal
+   (non-additive) blending on top of the real ShadowMaterial shadow,
+   so it reads as the shadow being tinted rather than glowing.
+------------------------------------------------------------------- */
+const SHADOW_FAR_COLOR = 0xe4e2dc; // matches --line, a light neutral grey
+
+function projectShadowCenter(objectPos, light) {
+  const dir = light.target.position.clone().sub(light.position).normalize();
+  const t = -objectPos.y / dir.y; // distance to travel along dir to reach y=0
+  return new THREE.Vector3(objectPos.x + dir.x * t, 0.005, objectPos.z + dir.z * t);
+}
+
+function makeShadowTintTexture(nearHex, farHex) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const near = new THREE.Color(nearHex);
+  const far = new THREE.Color(farHex);
+  const n = [Math.round(near.r * 255), Math.round(near.g * 255), Math.round(near.b * 255)];
+  const f = [Math.round(far.r * 255), Math.round(far.g * 255), Math.round(far.b * 255)];
+
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0.0, `rgba(${n[0]},${n[1]},${n[2]},0.55)`);
+  gradient.addColorStop(0.35, `rgba(${n[0]},${n[1]},${n[2]},0.4)`);
+  gradient.addColorStop(0.6, `rgba(${f[0]},${f[1]},${f[2]},0.22)`);
+  gradient.addColorStop(1.0, `rgba(${f[0]},${f[1]},${f[2]},0)`); // long fade = fuzzy far edge
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function makeShadowTint(nearHex, farHex, radius) {
+  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
+  const mat = new THREE.MeshBasicMaterial({
+    map: makeShadowTintTexture(nearHex, farHex),
+    transparent: true,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = 0.5; // after the ground's grey shadow (0), before the light-bleed glow (1)
+  return mesh;
+}
+
+const shadowTint = makeShadowTint(candyColor, SHADOW_FAR_COLOR, 1.3);
+shadowTint.position.copy(projectShadowCenter(placeholderCandy.position, key));
+scene.add(shadowTint);
+
+gsap.from(shadowTint.material, {
+  opacity: 0,
+  duration: 1,
+  ease: 'power2.out',
+  delay: 0.4,
+});
+
+/* ------------------------------------------------------------------
+   LIGHT BLEED — "light passing through the candy" effect.
+
+   True colored light transmission (light entering translucent sugar,
+   exiting tinted, landing as colored light) isn't something shadow
+   maps can do — they're occlusion-only, not color-aware. This fakes
+   it: a soft, additively-blended colored disc sitting right at the
+   candy's footprint, tinted to the candy's own color, drawn on top of
+   the real grey occlusion shadow from the ShadowMaterial ground.
+
+   It's deliberately placed directly under the candy (not offset to
+   match the angled key light's exact shadow position) — with the
+   camera now looking straight down, the two mostly coincide anyway,
+   and keeping the math simple makes this trivial to repeat per candy
+   once there are many. If it ever needs to precisely track the real
+   shadow instead, the fix is projecting this same disc along the
+   light's direction vector onto y=0 rather than straight down.
+------------------------------------------------------------------- */
+function makeGlowTexture(hexColor) {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const c = new THREE.Color(hexColor);
+  const r = Math.round(c.r * 255);
+  const g = Math.round(c.g * 255);
+  const b = Math.round(c.b * 255);
+
+  // transparent center, soft colored ring, fades out at the edge —
+  // mimics light concentrating near a curved bead's rim rather than
+  // a flat uniform tint
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0.0, `rgba(${r},${g},${b},0)`);
+  gradient.addColorStop(0.35, `rgba(${r},${g},${b},0.55)`);
+  gradient.addColorStop(0.65, `rgba(${r},${g},${b},0.3)`);
+  gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function makeLightBleed(hexColor, radius) {
+  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
+  const mat = new THREE.MeshBasicMaterial({
+    map: makeGlowTexture(hexColor),
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.85,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = 1; // draw after the ground's grey occlusion shadow
+  return mesh;
+}
+
+const lightBleed = makeLightBleed(candyColor, 0.85);
+lightBleed.position.set(placeholderCandy.position.x, 0.01, placeholderCandy.position.z);
+scene.add(lightBleed);
+
+gsap.from(lightBleed.material, {
+  opacity: 0,
+  duration: 1,
+  ease: 'power2.out',
+  delay: 0.6,
+});
+
+// --- GSAP demo hook ---
+// GSAP doesn't render anything itself; it's for tweening JS values
+// (including three.js object properties or shader uniforms) over
+// time. This is the pattern to reuse for a "drop in" animation once
+// there are multiple real candies.
+gsap.from(placeholderCandy.position, {
+  y: 3.5,
+  duration: 1.1,
+  ease: 'bounce.out',
+  delay: 0.2,
+});
+gsap.from(placeholderCandy.rotation, {
+  y: Math.PI * 1.5,
+  duration: 1.1,
+  ease: 'power2.out',
+  delay: 0.2,
+});
+
+// --- resize handling: keep the invisible ground aligned with the hero ---
+function handleResize() {
+  width = hero.clientWidth;
+  height = hero.clientHeight;
+  fitCameraFrustum();
+  renderer.setSize(width, height);
+}
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(handleResize, 150);
+});
+
+// --- render loop ---
+function tick() {
+  requestAnimationFrame(tick);
+  lightBleed.position.x = placeholderCandy.position.x;
+  lightBleed.position.z = placeholderCandy.position.z;
+  shadowTint.position.copy(projectShadowCenter(placeholderCandy.position, key));
+  renderer.render(scene, camera);
+}
+tick();
+</script>
 
 </body>
 </html>
