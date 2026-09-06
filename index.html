@@ -3,10 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
 <title>Rebecca — Designer</title>
 <style>
   :root {
-    --font-main: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    --font-main: 'DM Sans', Arial, sans-serif;
+    --font-special: Helvetica, 'Helvetica Neue', Arial, sans-serif;
     --bg: #FFFFFF;
     --ink: #171614;
     --ink-soft: #6B6862;
@@ -32,12 +36,13 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-main);
-    line-height: 1.5;
+    line-height: 1.425;
+    letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, .brand {
-    font-family: var(--font-main);
+    font-family: var(--font-special);
     font-weight: 700;
   }
 
@@ -70,7 +75,7 @@
   .brand {
     font-weight: 800;
     font-size: 1.15rem;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
   }
 
   .nav-links {
@@ -79,7 +84,7 @@
     list-style: none;
     font-weight: 600;
     font-size: 0.78rem;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
   }
 
   .nav-links a {
@@ -158,15 +163,15 @@
     font-size: 0.75rem;
     color: var(--accent);
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     margin-bottom: 14px;
   }
 
   .hero h1 {
     font-size: clamp(2.2rem, 5.5vw, 3.6rem);
     font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
+    line-height: 1.045;
+    letter-spacing: -0.03em;
   }
 
   .hero p {
@@ -174,7 +179,7 @@
     font-size: 0.82rem;
     color: var(--ink-soft);
     max-width: 400px;
-    line-height: 1.6;
+    line-height: 1.52;
   }
 
   .hero-actions {
@@ -271,7 +276,7 @@
   .section-head h2 {
     font-size: clamp(1.9rem, 3.4vw, 2.4rem);
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
   }
 
   .section-head p {
@@ -327,7 +332,7 @@
     margin-top: 6px;
     font-size: 0.7rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     color: var(--accent);
   }
 
@@ -752,9 +757,49 @@ scene.add(key);
 // ShadowMaterial renders nothing but the shadow falling on it — with
 // the renderer's transparent background, everywhere NOT in shadow is
 // see-through, showing the HTML text/page behind the canvas.
+let shadowGradientUniforms;
+const groundMaterial = new THREE.ShadowMaterial({ color: 0xffffff, opacity: 0.5 });
+groundMaterial.onBeforeCompile = (shader) => {
+  shader.uniforms.shadowCenters = shadowGradientUniforms.centers;
+  shader.uniforms.shadowColors = shadowGradientUniforms.colors;
+  shader.uniforms.shadowEdgeColor = shadowGradientUniforms.edgeColor;
+  shader.uniforms.shadowGradientRadius = shadowGradientUniforms.radius;
+
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vGroundWorldPosition;')
+    .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvGroundWorldPosition = worldPosition.xyz;');
+
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+varying vec3 vGroundWorldPosition;
+uniform vec3 shadowCenters[${CANDY_COUNT}];
+uniform vec3 shadowColors[${CANDY_COUNT}];
+uniform vec3 shadowEdgeColor;
+uniform float shadowGradientRadius;`
+    )
+    .replace(
+      'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );',
+      `float closestShadowDistance = 1e6;
+vec3 closestShadowColor = shadowEdgeColor;
+for ( int i = 0; i < ${CANDY_COUNT}; i++ ) {
+  float distanceToCenter = length(vGroundWorldPosition.xz - shadowCenters[i].xz);
+  if (distanceToCenter < closestShadowDistance) {
+    closestShadowDistance = distanceToCenter;
+    closestShadowColor = shadowColors[i];
+  }
+}
+float gradientProgress = smoothstep(0.08, 1.0, closestShadowDistance / shadowGradientRadius);
+vec3 shadowGradientColor = mix(closestShadowColor, shadowEdgeColor, gradientProgress);
+gl_FragColor = vec4(shadowGradientColor, opacity * (1.0 - getShadowMask()));`
+    );
+};
+groundMaterial.customProgramCacheKey = () => 'candy-shadow-mask-gradient-v1';
+
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(1, 1),
-  new THREE.ShadowMaterial({ color: candyColor, opacity: 0.5 })
+  groundMaterial
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
@@ -840,6 +885,9 @@ function makeKonpeitoGeometry(radius, knobCount, knobHeight, knobFalloff, detail
   // this non-indexed geometry would give each triangle its own normal and
   // make the otherwise round candy look faceted.
   geo.attributes.normal.needsUpdate = true;
+  // Vertex positions were changed above, so refresh the bounds used for
+  // collision, spawn spacing, and picking.
+  geo.computeBoundingSphere();
   // These peak samples are also used as inexpensive ground-contact points
   // when the candy rolls; no per-frame scan of the dense render mesh needed.
   geo.userData.coreRadius = radius;
@@ -858,7 +906,7 @@ const candyGeo = makeKonpeitoGeometry(
   /* knobCount */ 42,
   /* knobHeight */ 0.5,
   /* knobFalloff */ 0.35,
-  /* detail */ 11
+  /* detail */ 9
 );
 
 const candyMat = new THREE.MeshPhysicalMaterial({
@@ -866,9 +914,9 @@ const candyMat = new THREE.MeshPhysicalMaterial({
   flatShading: false,
   // Short attenuation makes the longer light path through the center
   // substantially foggier than the thinner edges.
-  roughness: 0.76,
-  clearcoat: 0.62,
-  clearcoatRoughness: 0.58,
+  roughness: 0.7,
+  clearcoat: 0.68,
+  clearcoatRoughness: 0.5,
   transmission: 0.1,
   thickness: 2,
   attenuationColor: candyColor,
@@ -877,49 +925,60 @@ const candyMat = new THREE.MeshPhysicalMaterial({
 });
 
 // Saturation follows the finished lighting instead of applying uniformly:
-// darkest 25% = full boost, middle 50% = smooth fade, brightest 25% = none.
-candyMat.onBeforeCompile = (shader) => {
-  shader.fragmentShader = shader.fragmentShader.replace(
-    '#include <opaque_fragment>',
-    `
-      float candyLuminance = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-      float candyBrightness = clamp(candyLuminance / 1.2, 0.0, 1.0);
-      float shadowSaturation = 2.2 - smoothstep(0.1, 0.75, candyBrightness);
-      float shadowLift = 1.0 - smoothstep(0.0, 0.2, candyBrightness);
-      float highlightBoost = smoothstep(0.1, 1.0, candyBrightness);
-      outgoingLight = mix(
-        vec3(candyLuminance),
-        outgoingLight,
-        1.0 + 0.25 * shadowSaturation
-      );
-      outgoingLight *= 1.0 + 0.25 * shadowLift;
-      outgoingLight *= 1.0 + 0.5 * highlightBoost;
-      #include <opaque_fragment>
-    `
-  );
-};
-candyMat.customProgramCacheKey = () => 'shadow-weighted-candy-saturation-v1';
+// only the darkest ~12% is richly colored; midtones and highlights stay put.
+// This is applied to every per-color material below; Material.clone() does
+// not carry an onBeforeCompile callback over by itself.
+function addCandyShadowSaturation(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `
+        float candyLuminance = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+        float candyBrightness = clamp(candyLuminance, 0.0, 1.0);
+        float shadowAmount = 1.0 - smoothstep(0.02, 0.5, candyBrightness);
+        vec3 saturatedShadow = mix(vec3(candyLuminance), outgoingLight, 2.2);
+        outgoingLight = mix(outgoingLight, saturatedShadow, shadowAmount);
+        #include <opaque_fragment>
+      `
+    );
+  };
+  material.customProgramCacheKey = () => 'saturated-candy-surface-shadows-v2';
+}
+
+addCandyShadowSaturation(candyMat);
 
 const placeholderCandy = new THREE.Mesh(candyGeo, candyMat);
 // Change this to control how many candies appear on each page load.
-const CANDY_COUNT = 45;
-const CANDY_RADIUS = 0.75;
+const CANDY_COUNT = 25;
+const CANDY_RADIUS = candyGeo.boundingSphere.radius;
 const CANDY_COLORS = [
   0xffb6cf, // pink
   0xffea8a, // yellow
   0xbce6bd, // green
   0xfffbfc, // cloudy white
 ];
+const CANDY_COLOR_WEIGHTS = [0.4, 0.125, 0.125, 0.35];
+
+function pickCandyColorIndex() {
+  let choice = Math.random();
+  for (let index = 0; index < CANDY_COLOR_WEIGHTS.length; index++) {
+    choice -= CANDY_COLOR_WEIGHTS[index];
+    if (choice <= 0) return index;
+  }
+  return CANDY_COLOR_WEIGHTS.length - 1;
+}
+
 const candyMaterials = CANDY_COLORS.map((color) => {
   const material = candyMat.clone();
   material.color.setHex(color);
   material.attenuationColor.setHex(color);
+  addCandyShadowSaturation(material);
   return material;
 });
 // Keep the hero copy clear. The inner circle is never used; between these
 // radii, the spawn chance eases from 0% to 100% rather than creating a hard
 // visible ring of candies around the text.
-const TEXT_CLEAR_RADIUS = 4;
+const TEXT_CLEAR_RADIUS = 3;
 const TEXT_SPAWN_FADE_RADIUS = 3;
 const candies = [];
 
@@ -953,8 +1012,8 @@ function placeCandyRandomly(candy) {
 }
 
 for (let i = 0; i < CANDY_COUNT; i++) {
-  const candy = i === 0 ? placeholderCandy : placeholderCandy.clone();
-  const colorIndex = Math.floor(Math.random() * CANDY_COLORS.length);
+  const candy = i === 0 ? placeholderCandy : new THREE.Mesh(candyGeo, candyMat);
+  const colorIndex = pickCandyColorIndex();
   candy.material = candyMaterials[colorIndex];
   candy.castShadow = true;
   candy.receiveShadow = false;
@@ -966,153 +1025,24 @@ for (let i = 0; i < CANDY_COUNT; i++) {
   scene.add(candy);
 }
 
-/* ------------------------------------------------------------------
-   SHADOW TINT — candy color bleeding into the cast shadow itself.
-
-   Unlike the light-bleed glow below (which stays directly under the
-   candy, representing light transmitting straight down through the
-   base), this needs to sit at the shadow's ACTUAL position — which is
-   offset from the candy because the key light comes in at an angle,
-   not straight down. So this projects the candy's position along the
-   real light direction onto the ground, the same math a real shadow
-   uses, and centers the gradient there instead of guessing.
-
-   Gradient: candy color near the object, fading through to a light
-   neutral grey further out, with a long soft tail at the outer edge
-   for the "fuzzier furthest from the candy" look. Drawn with normal
-   (non-additive) blending on top of the real ShadowMaterial shadow,
-   so it reads as the shadow being tinted rather than glowing.
-------------------------------------------------------------------- */
-const SHADOW_FAR_COLOR = candyColor;
-
 function projectShadowCenter(objectPos, light) {
-  const dir = light.target.position.clone().sub(light.position).normalize();
-  const t = -objectPos.y / dir.y; // distance to travel along dir to reach y=0
-  return new THREE.Vector3(objectPos.x + dir.x * t, 0.005, objectPos.z + dir.z * t);
+  const direction = light.target.position.clone().sub(light.position).normalize();
+  const distanceToGround = -objectPos.y / direction.y;
+  return new THREE.Vector3(
+    objectPos.x + direction.x * distanceToGround,
+    0,
+    objectPos.z + direction.z * distanceToGround
+  );
 }
 
-function makeShadowTintTexture(nearHex, farHex) {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const near = new THREE.Color(nearHex);
-  const far = new THREE.Color(farHex);
-  const n = [Math.round(near.r * 255), Math.round(near.g * 255), Math.round(near.b * 255)];
-  const f = [Math.round(far.r * 255), Math.round(far.g * 255), Math.round(far.b * 255)];
-
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0.0, `rgba(${n[0]},${n[1]},${n[2]},0.55)`);
-  gradient.addColorStop(0.35, `rgba(${n[0]},${n[1]},${n[2]},0.4)`);
-  gradient.addColorStop(0.6, `rgba(${f[0]},${f[1]},${f[2]},0.22)`);
-  gradient.addColorStop(1.0, `rgba(${f[0]},${f[1]},${f[2]},0)`); // long fade = fuzzy far edge
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-function makeShadowTint(nearHex, farHex, radius) {
-  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
-  const mat = new THREE.MeshBasicMaterial({
-    map: makeShadowTintTexture(nearHex, farHex),
-    transparent: true,
-    depthWrite: false,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.renderOrder = 0.5; // after the ground's grey shadow (0), before the light-bleed glow (1)
-  return mesh;
-}
-
-const shadowTint = makeShadowTint(candyColor, SHADOW_FAR_COLOR, 1.3);
-shadowTint.position.copy(projectShadowCenter(placeholderCandy.position, key));
-scene.add(shadowTint);
-
-gsap.from(shadowTint.material, {
-  opacity: 0,
-  duration: 1,
-  ease: 'power2.out',
-  delay: 0.4,
-});
-
-/* ------------------------------------------------------------------
-   LIGHT BLEED — "light passing through the candy" effect.
-
-   True colored light transmission (light entering translucent sugar,
-   exiting tinted, landing as colored light) isn't something shadow
-   maps can do — they're occlusion-only, not color-aware. This fakes
-   it: a soft, additively-blended colored disc sitting right at the
-   candy's footprint, tinted to the candy's own color, drawn on top of
-   the real grey occlusion shadow from the ShadowMaterial ground.
-
-   It's deliberately placed directly under the candy (not offset to
-   match the angled key light's exact shadow position) — with the
-   camera now looking straight down, the two mostly coincide anyway,
-   and keeping the math simple makes this trivial to repeat per candy
-   once there are many. If it ever needs to precisely track the real
-   shadow instead, the fix is projecting this same disc along the
-   light's direction vector onto y=0 rather than straight down.
-------------------------------------------------------------------- */
-function makeGlowTexture(hexColor) {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const c = new THREE.Color(hexColor);
-  const r = Math.round(c.r * 255);
-  const g = Math.round(c.g * 255);
-  const b = Math.round(c.b * 255);
-
-  // transparent center, soft colored ring, fades out at the edge —
-  // mimics light concentrating near a curved bead's rim rather than
-  // a flat uniform tint
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0.0, `rgba(${r},${g},${b},0)`);
-  gradient.addColorStop(0.35, `rgba(${r},${g},${b},0.55)`);
-  gradient.addColorStop(0.65, `rgba(${r},${g},${b},0.3)`);
-  gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-function makeLightBleed(hexColor, radius) {
-  const geo = new THREE.PlaneGeometry(radius * 2, radius * 2);
-  const mat = new THREE.MeshBasicMaterial({
-    map: makeGlowTexture(hexColor),
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    opacity: 0.85,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.renderOrder = 1; // draw after the ground's grey occlusion shadow
-  return mesh;
-}
-
-const lightBleed = makeLightBleed(candyColor, 0.85);
-lightBleed.position.set(placeholderCandy.position.x, 0.01, placeholderCandy.position.z);
-scene.add(lightBleed);
-
-gsap.from(lightBleed.material, {
-  opacity: 0,
-  duration: 1,
-  ease: 'power2.out',
-  delay: 0.6,
-});
+// The gradient is calculated on the ground, but its alpha comes directly
+// from Three.js's real directional-light shadow mask.
+shadowGradientUniforms = {
+  centers: { value: candies.map((candy) => projectShadowCenter(candy.position, key)) },
+  colors: { value: candies.map((candy) => new THREE.Color(candy.userData.color)) },
+  edgeColor: { value: new THREE.Color(0xd9d7d1) },
+  radius: { value: CANDY_RADIUS * 1.4 },
+};
 
 // --- GSAP demo hook ---
 // GSAP doesn't render anything itself; it's for tweening JS values
@@ -1137,23 +1067,23 @@ gsap.from(placeholderCandy.rotation, {
 // --- drag-to-roll controls ---
 // Pointer coordinates are cast through the camera onto the actual ground
 // plane, so every canvas pixel maps to the same visible ground position.
-const ROLL_RADIUS = 0.75;
+const ROLL_RADIUS = CANDY_RADIUS;
 // Artistic roll ratio: higher values make the candy turn more for the same
 // drag or momentum distance without changing how far it travels.
 const ROLL_ROTATION_MULTIPLIER = 1.7;
 // Low resistance preserves the release velocity, so the candy keeps both
 // travelling and rolling after the pointer is released.
-const ROLL_RESISTANCE = 1;
+const ROLL_RESISTANCE = 1.3;
 // End the lingering slow coast once motion is no longer intentional-looking.
-const ROLL_STOP_SPEED = 1;
+const ROLL_STOP_SPEED = 0.4;
 const RELEASE_SPEED_MULTIPLIER = 1.35;
-const MAX_RELEASE_SPEED = 5.5;
+const MAX_RELEASE_SPEED = 8;
 const CANDY_COLLISION_RESTITUTION = 0.55;
 const CANDY_COLLISION_PADDING = 0.02;
 // A nub that gets this close to the floor becomes an extra support point.
 // Keeping this small makes the hand-off feel pleasantly bumpy rather than
 // letting the candy suddenly flatten itself against the ground.
-const CONTACT_SNAP_DISTANCE = 0.05;
+const CONTACT_SNAP_DISTANCE = 0.25;
 const MAX_GROUND_CONTACTS = 3;
 const CONTACT_TILT_SPEED = 10;
 const MAX_CONTACT_TILT = 0.1;
@@ -1449,9 +1379,9 @@ function tick() {
       settleCandyOnGround(candy, deltaSeconds);
     }
   }
-  lightBleed.position.x = placeholderCandy.position.x;
-  lightBleed.position.z = placeholderCandy.position.z;
-  shadowTint.position.copy(projectShadowCenter(placeholderCandy.position, key));
+  for (const [index, candy] of candies.entries()) {
+    shadowGradientUniforms.centers.value[index].copy(projectShadowCenter(candy.position, key));
+  }
   renderer.render(scene, camera);
 }
 tick();
