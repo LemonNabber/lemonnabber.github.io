@@ -135,7 +135,14 @@
     pointer-events: none; /* flip to auto once candies are interactive/draggable */
   }
 
-  .candy-stage canvas { display: block; width: 100%; height: 100%; }
+  .candy-stage canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    touch-action: none;
+    cursor: grab;
+  }
 
   .hero-inner {
     position: relative;
@@ -502,6 +509,7 @@
       <a href="#work" class="btn btn-primary">See my work</a>
       <a href="#contact" class="btn btn-secondary">Get in touch</a>
     </div>
+    <p class="hero-hint">Psst… the candies like to be dragged ✦</p>
   </div>
 
   <div class="scroll-cue"><span></span>scroll</div>
@@ -676,6 +684,8 @@ import * as THREE from 'three';
 
 const stageEl = document.getElementById('candyStage');
 const hero = document.getElementById('top');
+// Single color source for the candy and all of its colored lighting.
+const candyColor = 0xfcccec; // cloudy, nearly white blush
 
 let width = hero.clientWidth;
 let height = hero.clientHeight;
@@ -693,14 +703,17 @@ stageEl.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 
 // --- camera ---
-// Orthographic + straight top-down = true parallel projection onto the
-// floor, matching "looking directly down, parallel with the floor."
-// (A perspective camera pointed straight down would still converge
-// toward a vanishing point; orthographic doesn't.)
+// Orthographic viewing keeps the layout parallel; a subtle pitch reveals
+// a little of the candy's vertical form without adding perspective.
 const VIEW_HEIGHT = 5; // world units visible vertically at aspect 1
+const CAMERA_PITCH_DEGREES = 20;
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 50);
 camera.up.set(0, 0, -1); // avoid gimbal ambiguity when looking straight down +Y
-camera.position.set(0, 10, 0);
+camera.position.set(
+  0,
+  10,
+  Math.tan(THREE.MathUtils.degToRad(CAMERA_PITCH_DEGREES)) * 10
+);
 camera.lookAt(0, 0, 0);
 
 function fitCameraFrustum() {
@@ -716,44 +729,59 @@ fitCameraFrustum();
 // --- lights ---
 // Soft ambient/hemisphere fill so shadows don't crush to pure black,
 // plus one key directional light that actually casts the shadow.
-const hemi = new THREE.HemisphereLight(0xfff7ea, 0xd8cdb8, 0.55);
-scene.add(hemi);
+// Use neutral overhead light and a ground-facing fill derived from the candy.
+const hemi = new THREE.HemisphereLight(0xffffff, candyColor, 1.55);
+// scene.add(hemi);
 
-const key = new THREE.DirectionalLight(0xffffff, 1.4);
+// Gentle all-direction fill lifts the candy's self-shadowed nubs without
+// affecting the directional ground-shadow diffusion.
+const ambient = new THREE.AmbientLight(0xffffff, 2);
+scene.add(ambient);
+
+const key = new THREE.DirectionalLight(0xffffff, 1);
 key.position.set(3.2, 6, 3.5);
 key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
+// A slightly lower-resolution PCF map gives the ground contact a gentler,
+// wider penumbra instead of a crisp computer-graphics edge.
+key.shadow.mapSize.set(1024, 1024);
 key.shadow.bias = -0.0015;
-key.shadow.radius = 9; // wider PCF blur = fuzzier penumbra; core shadow opacity (set by ShadowMaterial below) is untouched, so brightness of the shadow itself doesn't change
+key.shadow.radius = 18;
 scene.add(key);
 
 // --- invisible shadow-catcher ground ---
 // ShadowMaterial renders nothing but the shadow falling on it — with
 // the renderer's transparent background, everywhere NOT in shadow is
 // see-through, showing the HTML text/page behind the canvas.
-const GROUND_SIZE = 12;
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE),
-  new THREE.ShadowMaterial({ opacity: 0.32 })
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.ShadowMaterial({ color: candyColor, opacity: 0.5 })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// fit the key light's shadow frustum to the ground so shadow quality
-// isn't wasted on space nothing occupies
-const d = GROUND_SIZE / 2;
-key.shadow.camera.left = -d;
-key.shadow.camera.right = d;
-key.shadow.camera.top = d;
-key.shadow.camera.bottom = -d;
-key.shadow.camera.near = 0.5;
-key.shadow.camera.far = 20;
-key.shadow.camera.updateProjectionMatrix();
 // target the origin so the frustum above actually lines up
 scene.add(key.target);
 key.target.position.set(0, 0, 0);
+
+function fitGroundToViewport() {
+  const groundWidth = camera.right - camera.left;
+  const groundHeight = camera.top - camera.bottom;
+  ground.scale.set(groundWidth, groundHeight, 1);
+
+  // Keep the shadow map comfortably larger than the visible receiver,
+  // including the directional-light offset of a cast shadow.
+  const shadowExtent = Math.max(groundWidth, groundHeight) * 0.75;
+  key.shadow.camera.left = -shadowExtent;
+  key.shadow.camera.right = shadowExtent;
+  key.shadow.camera.top = shadowExtent;
+  key.shadow.camera.bottom = -shadowExtent;
+  key.shadow.camera.near = 0.5;
+  key.shadow.camera.far = 20;
+  key.shadow.camera.updateProjectionMatrix();
+}
+fitGroundToViewport();
 
 /* ------------------------------------------------------------------
    PLACEHOLDER "candy" — a bumpy sphere, NOT final art.
@@ -766,11 +794,11 @@ key.target.position.set(0, 0, 0);
 /* ------------------------------------------------------------------
    Placeholder "candy" geometry — konpeito's real distinguishing
    feature isn't uniform roughness, it's a countable number of smooth,
-   distinct conical knobs scattered fairly evenly over an otherwise
+   distinct, rounded spikes scattered fairly evenly over an otherwise
    round core. Random per-vertex noise (what was here before) reads
    as a rough asteroid instead. This places knob centers using a
    Fibonacci sphere distribution (even coverage, no clustering/gaps),
-   then raises a smooth falloff bump at each one.
+   then raises a smooth falloff dome at each one.
 
    Still not final art — a stand-in to judge whether procedural is
    good enough or a sourced/sculpted model is worth the licensing and
@@ -797,8 +825,10 @@ function makeKonpeitoGeometry(radius, knobCount, knobHeight, knobFalloff, detail
     let bump = 0;
     for (let k = 0; k < knobs.length; k++) {
       const d = v.distanceTo(knobs[k]);
-      const influence = Math.max(0, 1 - d / knobFalloff);
-      bump += influence * influence * influence; // smooth peak, not a hard cone
+      const t = Math.min(1, d / knobFalloff);
+      // A cosine dome has a zero slope at its center and edge, keeping
+      // every konpeito bump round rather than giving it a conical tip.
+      bump += 0.5 * (1 + Math.cos(Math.PI * t));
     }
     bump = Math.min(bump, 1.5); // clamp where knobs overlap
 
@@ -806,35 +836,135 @@ function makeKonpeitoGeometry(radius, knobCount, knobHeight, knobFalloff, detail
     pos.setXYZ(i, v.x, v.y, v.z);
   }
 
-  geo.computeVertexNormals();
+  // Keep the icosphere's shared, radial normals: recomputing normals on
+  // this non-indexed geometry would give each triangle its own normal and
+  // make the otherwise round candy look faceted.
+  geo.attributes.normal.needsUpdate = true;
+  // These peak samples are also used as inexpensive ground-contact points
+  // when the candy rolls; no per-frame scan of the dense render mesh needed.
+  geo.userData.coreRadius = radius;
+  geo.userData.contactPoints = knobs.map((direction) => ({
+    direction: direction.clone(),
+    radius: radius * (1 + knobHeight),
+  }));
+  geo.userData.knobs = knobs;
+  geo.userData.knobHeight = knobHeight;
+  geo.userData.knobFalloff = knobFalloff;
   return geo;
 }
 
 const candyGeo = makeKonpeitoGeometry(
-  /* radius */ 0.55,
-  /* knobCount */ 34,
-  /* knobHeight */ 0.48,
-  /* knobFalloff */ 0.4,
-  /* detail */ 5
+  /* radius */ 0.4,
+  /* knobCount */ 42,
+  /* knobHeight */ 0.5,
+  /* knobFalloff */ 0.35,
+  /* detail */ 11
 );
-
-const candyColor = 0xf2879c; // stand-in konpeito pink, swap per-candy later
 
 const candyMat = new THREE.MeshPhysicalMaterial({
   color: candyColor,
-  roughness: 0.35,
-  clearcoat: 0.6,
-  clearcoatRoughness: 0.25,
-  transmission: 0.35,    // hints at translucency; not true light-through-shadow
-  thickness: 0.6,
+  flatShading: false,
+  // Short attenuation makes the longer light path through the center
+  // substantially foggier than the thinner edges.
+  roughness: 0.76,
+  clearcoat: 0.62,
+  clearcoatRoughness: 0.58,
+  transmission: 0.1,
+  thickness: 2,
+  attenuationColor: candyColor,
+  attenuationDistance: 5,
   ior: 1.45,
 });
 
+// Saturation follows the finished lighting instead of applying uniformly:
+// darkest 25% = full boost, middle 50% = smooth fade, brightest 25% = none.
+candyMat.onBeforeCompile = (shader) => {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <opaque_fragment>',
+    `
+      float candyLuminance = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+      float candyBrightness = clamp(candyLuminance / 1.2, 0.0, 1.0);
+      float shadowSaturation = 2.2 - smoothstep(0.1, 0.75, candyBrightness);
+      float shadowLift = 1.0 - smoothstep(0.0, 0.2, candyBrightness);
+      float highlightBoost = smoothstep(0.1, 1.0, candyBrightness);
+      outgoingLight = mix(
+        vec3(candyLuminance),
+        outgoingLight,
+        1.0 + 0.25 * shadowSaturation
+      );
+      outgoingLight *= 1.0 + 0.25 * shadowLift;
+      outgoingLight *= 1.0 + 0.5 * highlightBoost;
+      #include <opaque_fragment>
+    `
+  );
+};
+candyMat.customProgramCacheKey = () => 'shadow-weighted-candy-saturation-v1';
+
 const placeholderCandy = new THREE.Mesh(candyGeo, candyMat);
-placeholderCandy.position.set(0, 0.55, 0);
-placeholderCandy.castShadow = true;
-placeholderCandy.receiveShadow = false;
-scene.add(placeholderCandy);
+// Change this to control how many candies appear on each page load.
+const CANDY_COUNT = 45;
+const CANDY_RADIUS = 0.75;
+const CANDY_COLORS = [
+  0xffb6cf, // pink
+  0xffea8a, // yellow
+  0xbce6bd, // green
+  0xfffbfc, // cloudy white
+];
+const candyMaterials = CANDY_COLORS.map((color) => {
+  const material = candyMat.clone();
+  material.color.setHex(color);
+  material.attenuationColor.setHex(color);
+  return material;
+});
+// Keep the hero copy clear. The inner circle is never used; between these
+// radii, the spawn chance eases from 0% to 100% rather than creating a hard
+// visible ring of candies around the text.
+const TEXT_CLEAR_RADIUS = 4;
+const TEXT_SPAWN_FADE_RADIUS = 3;
+const candies = [];
+
+function placeCandyRandomly(candy) {
+  const xRange = [camera.left + CANDY_RADIUS, camera.right - CANDY_RADIUS];
+  const zRange = [camera.bottom + CANDY_RADIUS, camera.top - CANDY_RADIUS];
+  let fallback = {
+    x: Math.abs(xRange[0]) > Math.abs(xRange[1]) ? xRange[0] : xRange[1],
+    z: Math.abs(zRange[0]) > Math.abs(zRange[1]) ? zRange[0] : zRange[1],
+  };
+
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const x = THREE.MathUtils.randFloat(xRange[0], xRange[1]);
+    const z = THREE.MathUtils.randFloat(zRange[0], zRange[1]);
+    const distanceFromText = Math.hypot(x, z);
+    const spawnChance = THREE.MathUtils.smoothstep(
+      distanceFromText,
+      TEXT_CLEAR_RADIUS,
+      TEXT_CLEAR_RADIUS + TEXT_SPAWN_FADE_RADIUS
+    );
+    if (Math.random() > spawnChance) continue;
+
+    // Keep an outer-zone fallback for very dense candy counts. It preserves
+    // the text exclusion even if no fully non-overlapping slot remains.
+    fallback = { x, z };
+    candy.position.set(x, 0.55, z);
+    if (candies.every((other) => other.position.distanceToSquared(candy.position) > (CANDY_RADIUS * 2) ** 2)) return;
+  }
+
+  candy.position.set(fallback.x, 0.55, fallback.z);
+}
+
+for (let i = 0; i < CANDY_COUNT; i++) {
+  const candy = i === 0 ? placeholderCandy : placeholderCandy.clone();
+  const colorIndex = Math.floor(Math.random() * CANDY_COLORS.length);
+  candy.material = candyMaterials[colorIndex];
+  candy.castShadow = true;
+  candy.receiveShadow = false;
+  candy.userData.color = CANDY_COLORS[colorIndex];
+  candy.userData.velocity = new THREE.Vector3();
+  candy.userData.resting = false;
+  placeCandyRandomly(candy);
+  candies.push(candy);
+  scene.add(candy);
+}
 
 /* ------------------------------------------------------------------
    SHADOW TINT — candy color bleeding into the cast shadow itself.
@@ -853,7 +983,7 @@ scene.add(placeholderCandy);
    (non-additive) blending on top of the real ShadowMaterial shadow,
    so it reads as the shadow being tinted rather than glowing.
 ------------------------------------------------------------------- */
-const SHADOW_FAR_COLOR = 0xe4e2dc; // matches --line, a light neutral grey
+const SHADOW_FAR_COLOR = candyColor;
 
 function projectShadowCenter(objectPos, light) {
   const dir = light.target.position.clone().sub(light.position).normalize();
@@ -989,11 +1119,13 @@ gsap.from(lightBleed.material, {
 // (including three.js object properties or shader uniforms) over
 // time. This is the pattern to reuse for a "drop in" animation once
 // there are multiple real candies.
+let introFinished = false;
 gsap.from(placeholderCandy.position, {
   y: 3.5,
   duration: 1.1,
   ease: 'bounce.out',
   delay: 0.2,
+  onComplete: () => { introFinished = true; },
 });
 gsap.from(placeholderCandy.rotation, {
   y: Math.PI * 1.5,
@@ -1002,11 +1134,283 @@ gsap.from(placeholderCandy.rotation, {
   delay: 0.2,
 });
 
+// --- drag-to-roll controls ---
+// Pointer coordinates are cast through the camera onto the actual ground
+// plane, so every canvas pixel maps to the same visible ground position.
+const ROLL_RADIUS = 0.75;
+// Artistic roll ratio: higher values make the candy turn more for the same
+// drag or momentum distance without changing how far it travels.
+const ROLL_ROTATION_MULTIPLIER = 1.7;
+// Low resistance preserves the release velocity, so the candy keeps both
+// travelling and rolling after the pointer is released.
+const ROLL_RESISTANCE = 1;
+// End the lingering slow coast once motion is no longer intentional-looking.
+const ROLL_STOP_SPEED = 1;
+const RELEASE_SPEED_MULTIPLIER = 1.35;
+const MAX_RELEASE_SPEED = 5.5;
+const CANDY_COLLISION_RESTITUTION = 0.55;
+const CANDY_COLLISION_PADDING = 0.02;
+// A nub that gets this close to the floor becomes an extra support point.
+// Keeping this small makes the hand-off feel pleasantly bumpy rather than
+// letting the candy suddenly flatten itself against the ground.
+const CONTACT_SNAP_DISTANCE = 0.05;
+const MAX_GROUND_CONTACTS = 3;
+const CONTACT_TILT_SPEED = 10;
+const MAX_CONTACT_TILT = 0.1;
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const groundRaycaster = new THREE.Raycaster();
+const pointerNdc = new THREE.Vector2();
+const interaction = {
+  dragging: false, pointerId: null, candy: null, time: 0, offsetX: 0, offsetZ: 0,
+};
+const rollDelta = new THREE.Vector3();
+const groundPoint = new THREE.Vector3();
+const rollAxis = new THREE.Vector3();
+const worldUp = new THREE.Vector3(0, 1, 0);
+const lowestContact = { sample: null, y: 0 };
+const nearbyContacts = [];
+const contactOffset = new THREE.Vector3();
+const contactAxis = new THREE.Vector3();
+const collisionNormal = new THREE.Vector3();
+const collisionMove = new THREE.Vector3();
+const collisionVelocity = new THREE.Vector3();
+let previousFrameTime = performance.now();
+
+function pointerToGround(event, target) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointerNdc.set(
+    ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  groundRaycaster.setFromCamera(pointerNdc, camera);
+  return groundRaycaster.ray.intersectPlane(groundPlane, target) !== null;
+}
+
+function rollCandy(candy, move) {
+  const distance = move.length();
+  if (distance === 0) return;
+
+  candy.userData.resting = false;
+  candy.position.x += move.x;
+  candy.position.z += move.z;
+  rollAxis.crossVectors(move, worldUp).normalize();
+  candy.rotateOnWorldAxis(
+    rollAxis,
+    (distance / ROLL_RADIUS) * ROLL_ROTATION_MULTIPLIER
+  );
+}
+
+function settleCandyOnGround(candy, deltaSeconds) {
+  const samples = candyGeo.userData.contactPoints;
+  const isResting = candy.userData.resting;
+  const snapAmount = isResting ? 1 : 1 - Math.exp(-CONTACT_TILT_SPEED * deltaSeconds);
+  const contactThreshold = isResting ? Infinity : CONTACT_SNAP_DISTANCE;
+
+  // The first pass finds the lowest nub. While rolling, only nearly touching
+  // nubs may join it; at rest, the three lowest nubs are pulled into a stable
+  // support footprint. A point contact is always exact.
+  for (let pass = 0; pass < (isResting ? 10 : 2); pass++) {
+    lowestContact.sample = null;
+    lowestContact.y = Infinity;
+    nearbyContacts.length = 0;
+
+    for (const sample of samples) {
+      const y = sample.direction.clone()
+        .multiplyScalar(sample.radius)
+        .applyQuaternion(candy.quaternion).y;
+      if (y < lowestContact.y) {
+        lowestContact.sample = sample;
+        lowestContact.y = y;
+      }
+    }
+
+    for (const sample of samples) {
+      const y = sample.direction.clone()
+        .multiplyScalar(sample.radius)
+        .applyQuaternion(candy.quaternion).y;
+      const gap = y - lowestContact.y;
+      if (sample !== lowestContact.sample && gap <= contactThreshold) {
+        nearbyContacts.push({ sample, gap });
+      }
+    }
+    nearbyContacts.sort((a, b) => a.gap - b.gap);
+
+    for (const contact of nearbyContacts.slice(0, MAX_GROUND_CONTACTS - 1)) {
+      // Rotation about this horizontal axis lowers the candidate nub relative
+      // to the lowest nub without moving the candy across the tabletop.
+      contactOffset.copy(contact.sample.direction).multiplyScalar(contact.sample.radius)
+        .applyQuaternion(candy.quaternion)
+        .sub(
+          contactAxis.copy(lowestContact.sample.direction)
+            .multiplyScalar(lowestContact.sample.radius)
+            .applyQuaternion(candy.quaternion)
+        );
+      const horizontalDistance = Math.hypot(contactOffset.x, contactOffset.z);
+      if (horizontalDistance < 0.0001) continue;
+
+      contactAxis.set(-contactOffset.z / horizontalDistance, 0, contactOffset.x / horizontalDistance);
+      const tilt = Math.min(MAX_CONTACT_TILT, (contactOffset.y / horizontalDistance) * snapAmount);
+      candy.rotateOnWorldAxis(contactAxis, -tilt);
+    }
+  }
+
+  // This is the non-negotiable constraint: after every roll, the lowest nub
+  // is placed directly on y = 0 rather than eased toward a clearance height.
+  let lowestY = Infinity;
+  for (const sample of samples) {
+    const y = sample.direction.clone()
+      .multiplyScalar(sample.radius)
+      .applyQuaternion(candy.quaternion).y;
+    lowestY = Math.min(lowestY, y);
+  }
+  candy.position.y = -lowestY;
+
+  // Useful when tuning in devtools: this contains the one-to-three nubs that
+  // are currently acting as the candy's support footprint, beginning with
+  // the nub constrained exactly to the ground.
+  let primary = null;
+  let primaryY = Infinity;
+  for (const sample of samples) {
+    const y = sample.direction.clone()
+      .multiplyScalar(sample.radius)
+      .applyQuaternion(candy.quaternion).y + candy.position.y;
+    if (y < primaryY) {
+      primary = sample;
+      primaryY = y;
+    }
+  }
+  nearbyContacts.length = 0;
+  for (const sample of samples) {
+    if (sample === primary) continue;
+    const y = sample.direction.clone()
+      .multiplyScalar(sample.radius)
+      .applyQuaternion(candy.quaternion).y + candy.position.y;
+    if (y - primaryY <= contactThreshold) nearbyContacts.push({ sample, gap: y - primaryY });
+  }
+  nearbyContacts.sort((a, b) => a.gap - b.gap);
+  const supports = [primary, ...nearbyContacts.slice(0, MAX_GROUND_CONTACTS - 1).map((contact) => contact.sample)];
+  candy.userData.groundContacts = supports;
+}
+
+function resolveCandyCollisions() {
+  const collisionDistance = CANDY_RADIUS * 2 + CANDY_COLLISION_PADDING;
+
+  for (let i = 0; i < candies.length - 1; i++) {
+    for (let j = i + 1; j < candies.length; j++) {
+      const a = candies[i];
+      const b = candies[j];
+      collisionNormal.set(b.position.x - a.position.x, 0, b.position.z - a.position.z);
+      const distance = collisionNormal.length();
+      if (distance >= collisionDistance) continue;
+
+      // A pointer-controlled candy is kinematic: it bumps other candies but
+      // no collision may push it away from the pointer.
+      const aIsDragged = interaction.dragging && interaction.candy === a;
+      const bIsDragged = interaction.dragging && interaction.candy === b;
+      const inverseMassA = aIsDragged ? 0 : 1;
+      const inverseMassB = bIsDragged ? 0 : 1;
+      const inverseMassTotal = inverseMassA + inverseMassB;
+      if (inverseMassTotal === 0) continue;
+
+      if (distance < 0.0001) {
+        collisionNormal.set(1, 0, 0);
+      } else {
+        collisionNormal.multiplyScalar(1 / distance);
+      }
+
+      // Separate overlap by rolling the free candy/candies away from the
+      // contact, which keeps the visual rotation coupled to the bump.
+      const correction = collisionDistance - distance;
+      if (inverseMassA > 0) {
+        collisionMove.copy(collisionNormal).multiplyScalar(-correction * inverseMassA / inverseMassTotal);
+        rollCandy(a, collisionMove);
+      }
+      if (inverseMassB > 0) {
+        collisionMove.copy(collisionNormal).multiplyScalar(correction * inverseMassB / inverseMassTotal);
+        rollCandy(b, collisionMove);
+      }
+
+      // Exchange only the velocity directed into the collision normal. The
+      // dragged candy has zero inverse mass, so it never receives an impulse.
+      const relativeNormalSpeed = collisionVelocity.copy(b.userData.velocity)
+        .sub(a.userData.velocity)
+        .dot(collisionNormal);
+      if (relativeNormalSpeed >= 0) continue;
+
+      const impulse = -(1 + CANDY_COLLISION_RESTITUTION) * relativeNormalSpeed / inverseMassTotal;
+      if (inverseMassA > 0) a.userData.velocity.addScaledVector(collisionNormal, -impulse * inverseMassA);
+      if (inverseMassB > 0) b.userData.velocity.addScaledVector(collisionNormal, impulse * inverseMassB);
+    }
+  }
+}
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (!introFinished || !pointerToGround(event, groundPoint)) return;
+  let selectedCandy = null;
+  let closestHit = Infinity;
+  for (const candy of candies) {
+    const hitDistance = Math.hypot(
+      groundPoint.x - candy.position.x,
+      groundPoint.z - candy.position.z
+    );
+    if (hitDistance <= ROLL_RADIUS && hitDistance < closestHit) {
+      selectedCandy = candy;
+      closestHit = hitDistance;
+    }
+  }
+  if (!selectedCandy) return;
+
+  interaction.dragging = true;
+  interaction.pointerId = event.pointerId;
+  interaction.candy = selectedCandy;
+  interaction.time = event.timeStamp;
+  interaction.offsetX = groundPoint.x - selectedCandy.position.x;
+  interaction.offsetZ = groundPoint.z - selectedCandy.position.z;
+  selectedCandy.userData.velocity.set(0, 0, 0);
+  selectedCandy.userData.resting = false;
+  renderer.domElement.setPointerCapture(event.pointerId);
+  renderer.domElement.style.cursor = 'grabbing';
+  event.preventDefault();
+});
+
+renderer.domElement.addEventListener('pointermove', (event) => {
+  if (!interaction.dragging || event.pointerId !== interaction.pointerId) return;
+  if (!pointerToGround(event, groundPoint)) return;
+
+  const candy = interaction.candy;
+  const elapsed = Math.max((event.timeStamp - interaction.time) / 1000, 1 / 120);
+  rollDelta.set(
+    groundPoint.x - interaction.offsetX - candy.position.x,
+    0,
+    groundPoint.z - interaction.offsetZ - candy.position.z
+  );
+  rollCandy(candy, rollDelta);
+  candy.userData.velocity.copy(rollDelta).multiplyScalar(1 / elapsed).clampLength(0, 4);
+  interaction.time = event.timeStamp;
+  event.preventDefault();
+});
+
+function releaseCandy(event) {
+  if (!interaction.dragging || event.pointerId !== interaction.pointerId) return;
+  const candy = interaction.candy;
+  interaction.dragging = false;
+  // Preserve the measured final drag velocity: a faster mouse flick gives
+  // the candy a faster release, with a cap to keep it controllable.
+  candy.userData.velocity.multiplyScalar(RELEASE_SPEED_MULTIPLIER).clampLength(0, MAX_RELEASE_SPEED);
+  interaction.candy = null;
+  renderer.domElement.releasePointerCapture(event.pointerId);
+  renderer.domElement.style.cursor = 'grab';
+}
+
+renderer.domElement.addEventListener('pointerup', releaseCandy);
+renderer.domElement.addEventListener('pointercancel', releaseCandy);
+
 // --- resize handling: keep the invisible ground aligned with the hero ---
 function handleResize() {
   width = hero.clientWidth;
   height = hero.clientHeight;
   fitCameraFrustum();
+  fitGroundToViewport();
   renderer.setSize(width, height);
 }
 let resizeTimer;
@@ -1018,6 +1422,33 @@ window.addEventListener('resize', () => {
 // --- render loop ---
 function tick() {
   requestAnimationFrame(tick);
+  const now = performance.now();
+  const deltaSeconds = Math.min((now - previousFrameTime) / 1000, 0.05);
+  previousFrameTime = now;
+
+  if (introFinished) {
+    for (const candy of candies) {
+      const isDragging = interaction.dragging && interaction.candy === candy;
+      const velocity = candy.userData.velocity;
+      if (!isDragging && velocity.lengthSq() > ROLL_STOP_SPEED ** 2) {
+        // Use the same roll function after release as during a drag. Movement
+        // and spin therefore stay locked together for the full coast.
+        rollCandy(candy, rollDelta.copy(velocity).multiplyScalar(deltaSeconds));
+        velocity.multiplyScalar(Math.exp(-ROLL_RESISTANCE * deltaSeconds));
+      } else if (!isDragging) {
+        velocity.set(0, 0, 0);
+        candy.userData.resting = true;
+      }
+    }
+
+    resolveCandyCollisions();
+
+    for (const candy of candies) {
+      // Solve after movement, so the frame that is rendered always has a nub
+      // on the floor rather than briefly hovering between contact updates.
+      settleCandyOnGround(candy, deltaSeconds);
+    }
+  }
   lightBleed.position.x = placeholderCandy.position.x;
   lightBleed.position.z = placeholderCandy.position.z;
   shadowTint.position.copy(projectShadowCenter(placeholderCandy.position, key));
