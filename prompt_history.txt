@@ -1,0 +1,48 @@
+make me a website for a portfolio that has a start page for a short introduction and space to put a interactive experinece, and then a project page and an about me page. Make it cute/friendly with round sanserif font, and minimalist design.
+In the areas where you are missing personal infor just leave a placeholder
+
+remake the top section of the website w the blurb so its an interactive sticker box where star stickers start randomly placed and you can use your mouse to pick them up and move the mouse, and unlick it to put it back down. the stickers are chubby stars (in cmy color wheel colors), with thick white border and a very light grey lineart border around. when you "lift" the sticker the edge animates to peel, and unpeels when you put it back down. make it so the text in this start is all center aligned, and make it so to scroll to the next area, the rest of the page scrolls on top of this sticker section (sticky fixed to top of page, next part scrolls on top to cover it)
+
+can you make the background color pure white rather than off white? and make the main font helvetica. make subtext smaller, more size contrast. make it look minimalist like this for example.
+
+ok. i have a new idea, so i want to remove the stickers and you need to help me set up for the next step. instead of star stickers, id like to have 3d objects, little konpeito candies. i dont want to actually add the candies at this point, i just want help setting up the 3d environment. 
+
+so please think critically and let me know if this is logical or not, but i want to have the candies in the same space the stickers are at the very beginning. I want the starting text to be basically on the "floor" the candies are sitting on. to make this work, im thinking of maybe having the text sit on a normal site as before to avoid 2d x 3d complications. the candies are rendered seperately, on a white surface. but the surface isnt rendered, so when placed on top of the site w text it looks as if they are in the same environment. is that possible? I still want shadows and light that passes thru the candies to be visible on the "ground". and i also want to potentially use gsap shaders to make the rendering as realistic as possible on a website.
+
+should i be able to see the placeholder candy in the claude demo on the side? currently i dont see it
+
+ok. a few changes to make: the "candy" is behind the text, it should be on top. also, the camera should be looking directly down at the candy, parallel with the floor the candy is sitting on.
+
+ok, lets try to do the lighting now, since you mentioned thats the tricky part. i want to have the look that the light is passing thru the candy and leaving a bit of its color in the shadow.
+
+can you make the shadow of the candy also a little tinted in the same color, in a radial gradient from candy color to very light grey, and make any necesary changes to the lightsource to keep the brightness but make the edges of the shadow furthest from the candy fuzzier
+
+ok, good enough for now. how do we make the candies the right shape? should i give you a 3d model from the internet?
+
+ok, sure, procedural is fine. make the spikes prodrude a bit more, and make them more dense
+
+make the procedurally generated "candy" in the 3D environment have spikes the prodtrude more from the main circle. and make the spikes denser
+
+ok. make it 2x higher poly, and make sure all the "spikes" are rounded. I want them to look like konpeito
+
+make the geometry appear smoother without changing polycount.
+
+make the lighting softer. change the material to a frosted glass material
+
+actually make look it like so the candy is foggy in the inside but has a sheen on the surface
+
+make it so the foggyness of the material is stronger in the center. and make it so the light on the surface bounces on it more, so i cant see a distinct reflection from the light source
+
+make it so after it loads the user can click and drag to roll it around. when they let go, it keeps rolling a bit. make it behave w gravity, but make it hevy so it doenst move too easily.
+
+make it so when the mouse is draggin it, they move together exactly.
+
+the shadow is being cut off when the candy moves too far out. make sure the shadow plane is the same size as the window
+
+make it so the candy will spawn somewhere random on the screen. and make it so theres a count i can control on how many candies spawn when you reload the page. start the count at 2. make it so if one candy bonks the other, they move. if you are dragging the candy, it cant be bounced, it just moves the other candies it hits
+
+make it so the candy will spawn somewhere random on the screen. and make it so theres a count i can control on how many candies spawn when you reload the page. start the count at 2. make it so if one candy bonks the other, they move. if you are dragging the candy, it cant be bounced, it just moves the other candies it hits
+
+fill in the footer, the line about telling people to talk to me, my github username is LemonNabber, and linked in is Rebecca Rotenberg
+
+put the image in the folder into the profile pic in the about me section
