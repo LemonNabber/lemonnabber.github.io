@@ -144,9 +144,8 @@
     display: block;
     width: 100%;
     height: 100%;
-    pointer-events: auto;
+    pointer-events: none;
     touch-action: none;
-    cursor: grab;
   }
 
   .hero-inner {
@@ -373,14 +372,14 @@
     border-radius: 10px;
     background: var(--bg);
     border: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--ink-soft);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-align: center;
-    padding: 16px;
+    overflow: hidden;
+  }
+
+  .about-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .about-copy p { color: var(--ink-soft); font-size: 0.82rem; margin-bottom: 16px; }
@@ -509,7 +508,7 @@
   <div class="hero-inner">
     <p class="hero-eyebrow">Hi, I'm Rebecca</p>
     <h1>Rebecca is a designer who loves the little things.</h1>
-    <p>[PLACEHOLDER: one or two sentences on what you design, who you design for, and what makes your work distinct.]</p>
+    <p>I like design, illustration, coding, and motion graphics.</p>
     <div class="hero-actions">
       <a href="#work" class="btn btn-primary">See my work</a>
       <a href="#contact" class="btn btn-secondary">Get in touch</a>
@@ -598,13 +597,15 @@
 
   <section id="about">
     <div class="wrap about-grid">
-      <div class="about-photo">[PLACEHOLDER: your photo]</div>
+      <div class="about-photo">
+        <img src="4DF44FFE-C41B-421D-872D-970BDB1D66B8_1_105_c.jpeg" alt="Rebecca Rotenberg">
+      </div>
       <div class="about-copy">
         <div class="section-head">
           <h2>About me</h2>
         </div>
-        <p>[PLACEHOLDER: a paragraph about who you are — your background, how you got into design, and what drives your work.]</p>
-        <p>[PLACEHOLDER: a paragraph about your interests outside of design, and what "the little things" means to you and your process.]</p>
+        <p>I'm a Carnegie Mellon University Design student in the Class of 2027. I like to experiment with design and explore new ways of making ideas feel clear, playful, and thoughtful.</p>
+        <p>I care about the little details and the stories behind a design—what makes it memorable, useful, and human. Outside of design, I love dogs, plants, and spending time outdoors.</p>
         <ul class="skills-list">
           <li>[Skill]</li>
           <li>[Skill]</li>
@@ -621,11 +622,11 @@
       <div class="contact-info">
         <div class="section-head">
           <h2>Let's talk</h2>
-          <p>[PLACEHOLDER: a line inviting people to reach out — about work, collaboration, or just to say hi.]</p>
+          <p>Have a project, idea, or collaboration in mind? I'd love to hear from you.</p>
         </div>
         <a href="mailto:[email protected]">[[email protected]]</a>
-        <a href="https://github.com/[username]">[github.com/username]</a>
-        <a href="https://linkedin.com/in/[username]">[linkedin.com/in/username]</a>
+        <a href="https://github.com/LemonNabber">github.com/LemonNabber</a>
+        <a href="https://www.linkedin.com/in/rebecca-rotenberg-4a73172a2/">Rebecca Rotenberg on LinkedIn</a>
       </div>
 
       <form>
@@ -648,12 +649,10 @@
 
   <footer>
     <div class="wrap footer-row">
-      <span class="footer-note">© 2026 Rebecca. Built for [Class Name].</span>
+      <span class="footer-note">© 2026 Rebecca Rotenberg. Designed and built with care.</span>
       <div class="social-links">
-        <a href="#">GitHub</a>
-        <a href="#">LinkedIn</a>
-        <a href="#">Instagram</a>
-        <a href="#">Dribbble</a>
+        <a href="https://github.com/LemonNabber">GitHub</a>
+        <a href="https://www.linkedin.com/in/rebecca-rotenberg-4a73172a2/">LinkedIn</a>
       </div>
     </div>
   </footer>
@@ -1274,7 +1273,9 @@ function resolveCandyCollisions() {
   }
 }
 
-renderer.domElement.addEventListener('pointerdown', (event) => {
+hero.addEventListener('pointerdown', (event) => {
+  // Let links, form controls, and buttons receive their normal clicks.
+  if (event.target.closest?.('a, button, input, textarea, select, label')) return;
   if (!introFinished || !pointerToGround(event, groundPoint)) return;
   let selectedCandy = null;
   let closestHit = Infinity;
@@ -1298,12 +1299,12 @@ renderer.domElement.addEventListener('pointerdown', (event) => {
   interaction.offsetZ = groundPoint.z - selectedCandy.position.z;
   selectedCandy.userData.velocity.set(0, 0, 0);
   selectedCandy.userData.resting = false;
-  renderer.domElement.setPointerCapture(event.pointerId);
-  renderer.domElement.style.cursor = 'grabbing';
+  hero.setPointerCapture(event.pointerId);
+  hero.style.cursor = 'grabbing';
   event.preventDefault();
 });
 
-renderer.domElement.addEventListener('pointermove', (event) => {
+hero.addEventListener('pointermove', (event) => {
   if (!interaction.dragging || event.pointerId !== interaction.pointerId) return;
   if (!pointerToGround(event, groundPoint)) return;
 
@@ -1328,12 +1329,12 @@ function releaseCandy(event) {
   // the candy a faster release, with a cap to keep it controllable.
   candy.userData.velocity.multiplyScalar(RELEASE_SPEED_MULTIPLIER).clampLength(0, MAX_RELEASE_SPEED);
   interaction.candy = null;
-  renderer.domElement.releasePointerCapture(event.pointerId);
-  renderer.domElement.style.cursor = 'grab';
+  hero.releasePointerCapture(event.pointerId);
+  hero.style.cursor = '';
 }
 
-renderer.domElement.addEventListener('pointerup', releaseCandy);
-renderer.domElement.addEventListener('pointercancel', releaseCandy);
+hero.addEventListener('pointerup', releaseCandy);
+hero.addEventListener('pointercancel', releaseCandy);
 
 // --- resize handling: keep the invisible ground aligned with the hero ---
 function handleResize() {
