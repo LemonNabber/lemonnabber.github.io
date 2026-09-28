@@ -14,7 +14,7 @@
   // ---------- styles (all scoped to #eli5-*) ----------
   const style = document.createElement('style');
   style.textContent = `
-  #eli5-trigger, #eli5-bubble {
+  #eli5-trigger, #eli5-bubble, #eli5-help, #eli5-help-tip {
     --e-paper: #fdf8ec;
     --e-ink: #2B2118;
     --e-red: #E63946;
@@ -88,6 +88,71 @@
     color: var(--e-ink);
   }
   #eli5-bubble .eli5-loading { color: #6b5f4d; font-style: italic; }
+
+  /* ---------- corner help crayon ---------- */
+  #eli5-help {
+    position: fixed;
+    right: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    z-index: 9998;
+  }
+  #eli5-help-btn {
+    display: block;
+    margin: 0;
+    padding: 8px;
+    line-height: 0;
+    background: var(--e-yellow);
+    border: 2.5px solid var(--e-ink);
+    border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 var(--e-ink);
+    transform: rotate(-4deg);
+    transition: transform 0.15s ease;
+  }
+  #eli5-help:hover #eli5-help-btn,
+  #eli5-help.open #eli5-help-btn,
+  #eli5-help-btn:focus-visible { transform: rotate(0deg) scale(1.08); }
+
+  #eli5-help-tip {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 16px);
+    box-sizing: border-box;
+    width: 240px;
+    padding: 14px 16px;
+    background: var(--e-paper);
+    color: var(--e-ink);
+    border: 3px solid var(--e-ink);
+    border-radius: 22px 18px 24px 16px / 20px 24px 16px 22px;
+    box-shadow: 4px 4px 0 var(--e-blue);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    text-align: left;
+    transform-origin: bottom right;
+    transform: scale(0.4) rotate(-2deg);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s ease, opacity 0.15s ease;
+  }
+  #eli5-help:hover #eli5-help-tip,
+  #eli5-help.open #eli5-help-tip,
+  #eli5-help:focus-within #eli5-help-tip {
+    transform: scale(1) rotate(-0.7deg);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #eli5-help-tip::after, #eli5-help-tip::before {
+    content: ""; position: absolute; width: 0; height: 0; border: solid transparent;
+  }
+  #eli5-help-tip::after  { bottom: -14px; right: 18px; border-width: 12px 10px 0 10px; border-top-color: var(--e-ink); }
+  #eli5-help-tip::before { bottom: -9px;  right: 20px; border-width: 10px 8px 0 8px;  border-top-color: var(--e-paper); z-index: 1; }
+  #eli5-help-tip .eli5-label { display: block; margin-bottom: 4px; font-weight: 700; font-size: 0.85rem; color: var(--e-red); }
+  #eli5-help-tip ol { margin: 0; padding-left: 1.2em; }
+  #eli5-help-tip li { margin: 2px 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #eli5-help-btn, #eli5-help-tip { transition: none; }
+  }
   `;
   document.head.appendChild(style);
 
@@ -107,6 +172,25 @@
       <span class="eli5-close" id="eli5-close" role="button" aria-label="Close">&times;</span>
       <span class="eli5-label">explained like you're five:</span>
       <div id="eli5-text"></div>
+
+    <div id="eli5-help">
+      <div id="eli5-help-tip" role="tooltip">
+        <span class="eli5-label">how to use me:</span>
+        <ol>
+          <li>Highlight any text on the page</li>
+          <li>Click the little crayon that pops up</li>
+          <li>Get it explained like you're five!</li>
+        </ol>
+      </div>
+      <button id="eli5-help-btn" type="button" aria-label="How to use the explain like I'm 5 crayon" aria-describedby="eli5-help-tip">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+          <g transform="rotate(40 16 16)" stroke="#2B2118" stroke-width="2" stroke-linejoin="round">
+            <rect x="11" y="3" width="10" height="19" fill="#E63946"/>
+            <rect x="11" y="8" width="10" height="7" fill="#fdf8ec"/>
+            <polygon points="11,22 21,22 16,30" fill="#E63946"/>
+          </g>
+        </svg>
+      </button>
     </div>`;
   document.body.append(...root.children);
 
@@ -114,6 +198,8 @@
   const bubble = document.getElementById('eli5-bubble');
   const bubbleText = document.getElementById('eli5-text');
   const closeBtn = document.getElementById('eli5-close');
+  const help = document.getElementById('eli5-help');
+  const helpBtn = document.getElementById('eli5-help-btn');
 
   let selectedText = '';
   let selRect = null; // highlight position in page coordinates
@@ -124,7 +210,7 @@
 
   // ---------- show the crayon near a selection ----------
   function handleSelection(e) {
-    if (bubble.contains(e.target) || trigger.contains(e.target)) return;
+    if (bubble.contains(e.target) || trigger.contains(e.target) || help.contains(e.target)) return;
 
     // ignore text selected inside form fields
     const active = document.activeElement;
@@ -251,5 +337,13 @@
   closeBtn.addEventListener('click', () => {
     bubble.style.display = 'none';
     requestId++;
+  });
+  // ---------- corner help crayon: hover/focus shows the tip; tap toggles it on touch screens ----------
+  helpBtn.addEventListener('click', () => help.classList.toggle('open'));
+  document.addEventListener('mousedown', (e) => {
+    if (!help.contains(e.target)) help.classList.remove('open');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') help.classList.remove('open');
   });
 })();
