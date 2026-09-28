@@ -325,7 +325,7 @@ fitCameraFrustum();
 const ambient =
   new THREE.AmbientLight(
     0xffffff,
-    2
+    3
   );
 
 scene.add(
@@ -336,7 +336,7 @@ scene.add(
 const key =
   new THREE.DirectionalLight(
     0xffffff,
-    1
+    4
   );
 
 
@@ -387,12 +387,24 @@ let shadowGradientUniforms;
 const groundMaterial =
   new THREE.ShadowMaterial({
     color: 0xffffff,
-    opacity: 0.5
+    opacity: 0.7,
+    // Include the floor in the refraction pass, while retaining alpha
+    // blending in the main pass so the HTML beneath the canvas stays visible.
+    transparent: false,
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.SrcAlphaFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneMinusSrcAlphaFactor
   });
+
+const shadowRefractionPass = { value: false };
 
 
 groundMaterial.onBeforeCompile =
   (shader) => {
+
+    shader.uniforms.shadowRefractionPass = shadowRefractionPass;
 
     shader.uniforms.shadowCenters =
       shadowGradientUniforms.centers;
@@ -439,6 +451,7 @@ groundMaterial.onBeforeCompile =
 
           uniform vec3 shadowCenters[${CANDY_COUNT}];
           uniform vec3 shadowColors[${CANDY_COUNT}];
+          uniform bool shadowRefractionPass;
           uniform vec3 shadowEdgeColor;
           uniform float shadowGradientRadius;
           `
@@ -487,17 +500,17 @@ groundMaterial.onBeforeCompile =
 
           vec3 shadowGradientColor =
             mix(
-              closestShadowColor,
-              shadowEdgeColor,
+              pow(closestShadowColor, vec3(12.0)),
+              pow(closestShadowColor, vec3(4.0)),
               gradientProgress
             );
 
-          gl_FragColor =
-            vec4(
-              shadowGradientColor,
-              opacity *
-              (1.0 - getShadowMask())
-            );
+          float shadowAlpha = opacity * (1.0 - getShadowMask());
+          // Refraction samples a white floor with colored shadows. The main
+          // canvas shows only the shadows, preserving the HTML underneath.
+          gl_FragColor = shadowRefractionPass
+            ? vec4(mix(vec3(1.0), shadowGradientColor, shadowAlpha), 1.0)
+            : vec4(shadowGradientColor, shadowAlpha);
           `
         );
 
@@ -506,7 +519,7 @@ groundMaterial.onBeforeCompile =
 
 groundMaterial.customProgramCacheKey =
   () =>
-    'candy-shadow-mask-gradient-v1';
+    'candy-shadow-refraction-v3';
 
 
 const ground =
@@ -518,6 +531,10 @@ const ground =
     groundMaterial
   );
 
+
+ground.onBeforeRender = (activeRenderer) => {
+  shadowRefractionPass.value = activeRenderer.getRenderTarget() !== null;
+};
 
 ground.rotation.x =
   -Math.PI / 2;
@@ -730,6 +747,37 @@ function makeKonpeitoGeometry(
     true;
 
   geo.computeVertexNormals();
+
+  // The geometry repeats vertices for each triangle. Average normals at
+  // matching positions to keep the glossy surface from looking faceted.
+  const normals = geo.attributes.normal;
+  const sharedNormals = new Map();
+  const vertexKeys = [];
+  const faceNormal = new THREE.Vector3();
+
+  for (let i = 0; i < pos.count; i++) {
+    const key = [pos.getX(i), pos.getY(i), pos.getZ(i)]
+      .map((coordinate) => Math.round(coordinate * 1e6))
+      .join(',');
+    vertexKeys.push(key);
+
+    if (!sharedNormals.has(key)) {
+      sharedNormals.set(key, new THREE.Vector3());
+    }
+
+    sharedNormals.get(key).add(faceNormal.fromBufferAttribute(normals, i));
+  }
+
+  for (const normal of sharedNormals.values()) {
+    normal.normalize();
+  }
+
+  for (let i = 0; i < pos.count; i++) {
+    const normal = sharedNormals.get(vertexKeys[i]);
+    normals.setXYZ(i, normal.x, normal.y, normal.z);
+  }
+
+  normals.needsUpdate = true;
   geo.computeBoundingSphere();
 
 
@@ -769,7 +817,7 @@ const candyGeo = makeKonpeitoGeometry(
   /* knobCount */ 42,
   /* knobHeight */ 0.5,
   /* knobFalloff */ 0.35,
-  /* detail */ 13
+  /* detail */ 14
 );
 
 
@@ -777,43 +825,38 @@ const candyGeo = makeKonpeitoGeometry(
    CANDY SETUP
    ========================================================= */
 
+// Dragon-style glass: tint light inside the candy, with a smooth white surface.
+// Approximate the optical path through the rounded candy in its shader.
 const candyMat = new THREE.MeshPhysicalMaterial({
-  color: candyColor,
-  flatShading: false,
-  // Short attenuation makes the longer light path through the center
-  // substantially foggier than the thinner edges.
-  roughness: 0.7,
-  clearcoat: 0.68,
-  clearcoatRoughness: 0.5,
-  transmission: 0.1,
-  thickness: 2,
+  color: 0xffffff,
+  metalness: 0,
+  roughness: 0,
+  transmission: 1,
+  thickness: 2.27,
   attenuationColor: candyColor,
-  attenuationDistance: 5,
-  ior: 1.45,
+  attenuationDistance: 0.155,
+  ior: 1.5,
 });
 
-// Saturation follows the finished lighting instead of applying uniformly:
-// only the darkest ~12% is richly colored; midtones and highlights stay put.
-// This is applied to every per-color material below; Material.clone() does
-// not carry an onBeforeCompile callback over by itself.
-function addCandyShadowSaturation(material) {
+// Approximate a rounded volume: the optical path is longest through its
+// center and shorter at grazing angles. This is not a measured thickness map.
+function addCandyThickness(material) {
   material.onBeforeCompile = (shader) => {
+    const transmission = THREE.ShaderChunk.transmission_fragment.replace(
+      'material.thickness = thickness;',
+      `material.thickness = thickness * mix(
+        0.08, 1.0,
+        pow(clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 0.8)
+      );`
+    );
     shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      `
-        float candyLuminance = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-        float candyBrightness = clamp(candyLuminance, 0.0, 1.0);
-        float shadowAmount = 1.0 - smoothstep(0.02, 0.5, candyBrightness);
-        vec3 saturatedShadow = mix(vec3(candyLuminance), outgoingLight, 2.2);
-        outgoingLight = mix(outgoingLight, saturatedShadow, shadowAmount);
-        #include <opaque_fragment>
-      `
+      '#include <transmission_fragment>', transmission
     );
   };
-  material.customProgramCacheKey = () => 'saturated-candy-surface-shadows-v2';
+  material.customProgramCacheKey = () => 'candy-rounded-thickness-v1';
 }
 
-addCandyShadowSaturation(candyMat);
+addCandyThickness(candyMat);
 
 const placeholderCandy =
   new THREE.Mesh(
@@ -827,9 +870,9 @@ const CANDY_RADIUS =
 
 
 const CANDY_COLORS = [
-  0xffb6cf,
-  0xffea8a,
-  0xbce6bd,
+  0xffeef4,
+  0xfffef9,
+  0xf9fff8,
   0xfffbfc
 ];
 
@@ -885,20 +928,14 @@ const candyMaterials =
       const material =
         candyMat.clone();
 
-      material.color.setHex(
-        color
-      );
-
       material
         .attenuationColor
         .setHex(
           color
         );
 
-      addCandyShadowSaturation(
-        material
-      );
-
+      // Cloning a material does not copy its shader callback.
+      addCandyThickness(material);
       return material;
 
     }
