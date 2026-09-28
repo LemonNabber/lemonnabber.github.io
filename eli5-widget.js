@@ -95,6 +95,18 @@
     right: 20px;
     bottom: calc(20px + env(safe-area-inset-bottom, 0px));
     z-index: 9998;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(14px);
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+  }
+  #eli5-help.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s;
   }
   #eli5-help-btn {
     display: block;
@@ -151,7 +163,7 @@
   #eli5-help-tip li { margin: 2px 0; }
 
   @media (prefers-reduced-motion: reduce) {
-    #eli5-help-btn, #eli5-help-tip { transition: none; }
+    #eli5-help, #eli5-help-btn, #eli5-help-tip { transition: none; }
   }
   `;
   document.head.appendChild(style);
@@ -172,6 +184,7 @@
       <span class="eli5-close" id="eli5-close" role="button" aria-label="Close">&times;</span>
       <span class="eli5-label">explained like you're five:</span>
       <div id="eli5-text"></div>
+    </div>
 
     <div id="eli5-help">
       <div id="eli5-help-tip" role="tooltip">
@@ -346,4 +359,15 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') help.classList.remove('open');
   });
+  // ---------- show the corner crayon once the visitor reaches the Work section ----------
+  const workSection = document.getElementById('work');
+  if (workSection && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([entry]) => {
+      const reached = entry.isIntersecting || entry.boundingClientRect.top < 0;
+      help.classList.toggle('show', reached);
+      if (!reached) help.classList.remove('open');
+    }).observe(workSection);
+  } else {
+    help.classList.add('show'); // no #work section found: just always show it
+  }
 })();
