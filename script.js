@@ -870,10 +870,10 @@ const CANDY_RADIUS =
 
 
 const CANDY_COLORS = [
-  0xffeef4,
+  0xfffbfc,
   0xfffef9,
-  0xf9fff8,
-  0xfffbfc
+  0xfdfffc,
+  0xffffff
 ];
 
 
